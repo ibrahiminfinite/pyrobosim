@@ -37,6 +37,45 @@ class PRMGridPlanner:
 
         pass
 
+    def _distance(self, nodeA, nodeB):
+        """
+        Computes the distance from nodeA to nodeB
+
+        :param nodeA: The start node.
+        :type nodeA: [int, int]
+        :param nodeB: The end node.
+        :type nodeB: [int, int]
+        :return: The distance from nodeA to nodeB
+        :rtype: float
+        """
+
+        pass
+
+    def _distances_all(self, node):
+        """
+        Computes the distance from given node to all other nodes in the graph.
+        
+        :param node: The node from which to find distances to all other nodes.
+        :type node: [int, int]
+        :retrun: Distance from node to all other nodes.
+        :rtype: numpy.ndarray
+        """
+
+        pass
+
+    def _nearest(self, node, num_nearest=5):
+        """
+        Finds K nearest nodes in the graph to given node
+
+        :param node: The node for which to find the closest neighbours.
+        :type node: (int, int)
+        :param num_nearest: The number of nearest node to find.
+        :type num_nearest: int
+        :return: The `num_nearest` neighbours of `node` in the graph.
+        """
+
+        pass
+
     def plan(self, start, goal):
         """
         Plans a path from start to goal
