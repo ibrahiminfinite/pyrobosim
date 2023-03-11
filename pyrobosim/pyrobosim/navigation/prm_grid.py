@@ -114,8 +114,9 @@ class PRMGridPlanner:
         :rtype: bool
         """
         # Note: uint16 can only handle grids up to shape of (65535, 65535)
-        xs = np.random.randint(0, self.grid.width, self.max_node_samples, np.dtype)
-        ys = np.random.randint(0, self.grid.height, self.max_node_samples, np.dtype)
+        dtype = np.uint16
+        xs = np.random.randint(0, self.grid.width, self.max_node_samples, dtype)
+        ys = np.random.randint(0, self.grid.height, self.max_node_samples, dtype)
         i = 0
         j = 0
         while i < self.max_node_samples and j < self.num_nodes:
