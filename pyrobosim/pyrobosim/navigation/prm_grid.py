@@ -1,8 +1,8 @@
 """ Grid based PRM (Probablistic Roadmap) implementation. """
 
 import time
-import numpy as np
 import warnings
+import numpy as np
 from collections import defaultdict
 from pyrobosim.utils.motion import Path
 from pyrobosim.navigation.search_graph import Node
@@ -151,6 +151,12 @@ class PRMGridPlanner:
             warnings.warn(f"Goal position {self.goal} is occupied")
         return valid
 
+    def _find_path(self):
+        """
+        Uses A* to find a path from start to goal using the graph that was built
+        """
+        pass
+
     def plan(self, start, goal):
         """
         Plans a path from start to goal
@@ -173,3 +179,6 @@ class PRMGridPlanner:
             return self.latest_path
 
         self._add_start_goal(self.start, self.goal)
+        # TODO : Should the start and goal node be removed after the plan is made ?
+
+        self._find_path()
