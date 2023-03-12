@@ -237,6 +237,7 @@ class PRMGridPlanner:
             return self.latest_path
 
         # Planning
+        self.reset()
         self._add_start_goal()
         self._find_path()
         self._remove_start_goal()
