@@ -76,32 +76,6 @@ class PRMGridPlanner:
         )
         self.grid_generation_time = time.time() - ts
 
-    def _distance(self, nodeA, nodeB):
-        """
-        Computes the distance from nodeA to nodeB
-
-        :param nodeA: The start node.
-        :type nodeA: [int, int]
-        :param nodeB: The end node.
-        :type nodeB: [int, int]
-        :return: The distance from nodeA to nodeB
-        :rtype: float
-        """
-
-        pass
-
-    def _distances_all(self, node):
-        """
-        Computes the distance from given node to all other nodes in the graph.
-
-        :param node: The node from which to find distances to all other nodes.
-        :type node: [int, int]
-        :retrun: Distance from node to all other nodes.
-        :rtype: numpy.ndarray
-        """
-
-        pass
-
     def _sample_free_nodes(self):
         """
         Samples `num_nodes` in the free space.
