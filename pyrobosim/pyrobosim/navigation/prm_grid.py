@@ -202,7 +202,10 @@ class PRMGridPlanner:
 
     def reset(self, rebuild_graph=False):
         """
-        Resets the data structures and rebuilds the PRM graph
+        Resets the data structures and optionally rebuilds the PRM graph.
+
+        :param rebuild_graph: If true, rebuilds the PRM graph.
+        :type rebuild_graph: bool
         """
         self.goal = None
         self.start = None
