@@ -2,6 +2,10 @@
 
 import time
 import numpy as np
+import warnings
+from collections import defaultdict
+from pyrobosim.utils.motion import Path
+from pyrobosim.navigation.search_graph import Node
 from pyrobosim.navigation.occupancy_grid import occupancy_grid_from_world
 
 
@@ -52,8 +56,13 @@ class PRMGridPlanner:
         self.max_planning_time = max_planning_time
 
         # Data structures for planning
-        self.free_pos = np.zeros((self.num_nodes, 2), dtype=np.uint16)
         self._set_occupancy_grid()
+        self.latest_path = Path()
+        self.free_pos = np.zeros((self.num_nodes, 2), dtype=np.uint16)
+        # Stores the PRM graph
+        self.graph = defaultdict(
+            lambda: {"neighbours": np.ndarray, "costs": np.ndarray}
+        )
 
     def _set_occupancy_grid(self):
         """
@@ -93,19 +102,6 @@ class PRMGridPlanner:
 
         pass
 
-    def _nearest(self, node, num_nearest=5):
-        """
-        Finds K nearest nodes in the graph to given node
-
-        :param node: The node for which to find the closest neighbours.
-        :type node: (int, int)
-        :param num_nearest: The number of nearest node to find.
-        :type num_nearest: int
-        :return: The `num_nearest` neighbours of `node` in the graph.
-        """
-
-        pass
-
     def _sample_free_nodes(self):
         """
         Samples `num_nodes` in the free space.
@@ -126,6 +122,40 @@ class PRMGridPlanner:
                 j += 1
             i += 1
 
+    def _build_graph(self):
+        """
+        Builds the PRM graph
+        """
+
+        self._sample_free_nodes()
+        for i in range(self.num_nodes):
+            # Compute distance from given node to all other nodes.
+            x, y = self.free_pos[i][0], self.free_pos[i][1]
+            distances = np.linalg.norm([x, y] - self.free_pos, axis=1)
+            # Select only the nodes for which distance is not greater than `max_connection_dist`.
+            is_not_same_node = distances > 0
+            is_within_threshold = distances < self.max_connection_dist
+            nodes_within_threshold = np.where(is_within_threshold & is_not_same_node)
+            # Add edges from current node to all other nodes within `max_connection_dist`.
+            self.graph[(x, y)]["neighbours"] = self.free_pos[nodes_within_threshold]
+            self.graph[(x, y)]["costs"] = distances[nodes_within_threshold]
+
+    def _is_valid_start_goal(self):
+        """
+        Validate the start and goal locations provided to the planner
+
+        :return: True if the start and goal given to the planner are not occupied, else False
+        :rtype: bool
+        """
+        valid = True
+        if self.grid.is_occupied(self.start):
+            warnings.warn(f"Start position {self.start} is occupied")
+            valid = False
+        if self.grid.is_occupied(self.goal):
+            valid = False
+            warnings.warn(f"Goal position {self.goal} is occupied")
+        return valid
+
     def plan(self, start, goal):
         """
         Plans a path from start to goal
@@ -138,4 +168,12 @@ class PRMGridPlanner:
         :rtype: :class:`pyrobosim.utils.motion.Path`
         """
 
-        pass
+        if isinstance(start, Node):
+            start = start.pose
+        if isinstance(goal, Node):
+            goal = goal.pose
+        self.start = self.grid.world_to_grid((start.x, start.y))
+        self.goal = self.grid.world_to_grid((goal.x, goal.y))
+        # If start or goal position is occupied, return empty path with warning.
+        if not self._is_valid_start_goal():
+            return self.latest_path
