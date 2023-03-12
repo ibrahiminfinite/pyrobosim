@@ -56,6 +56,8 @@ class PRMGridPlanner:
         self.max_planning_time = max_planning_time
 
         # Data structures for planning
+        self.start = None
+        self.goal = None
         self._set_occupancy_grid()
         self.latest_path = Path()
         self.free_pos = np.zeros((self.num_nodes, 2), dtype=np.uint16)
