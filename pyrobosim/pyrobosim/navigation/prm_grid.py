@@ -79,9 +79,6 @@ class PRMGridPlanner:
     def _sample_free_nodes(self):
         """
         Samples `num_nodes` in the free space.
-
-        :return: True if successfully samples required number of free positions, else False
-        :rtype: bool
         """
         # Note: uint16 can only handle grids up to shape of (65535, 65535)
         dtype = np.uint16
@@ -96,23 +93,45 @@ class PRMGridPlanner:
                 j += 1
             i += 1
 
+    def _add_neighbours(self, node):
+        """
+        Finds the neighbours within `max_connection_distance` of given node and adds an edge if they are connectable.
+
+        :param node: The node for which to find neighbours
+        :type node: np.ndarray
+        """
+        # Compute distance from given node to all other nodes.
+        x, y = node[0], node[1]
+        distances = np.linalg.norm([x, y] - self.free_pos, axis=1)
+        # Select only the nodes for which distance is not greater than `max_connection_dist`.
+        is_not_same_node = distances > 0
+        is_within_threshold = distances < self.max_connection_dist
+        nodes_within_threshold = np.where(is_within_threshold & is_not_same_node)
+        # TODO : Check connectivity
+        # Add edges from current node to all other nodes within `max_connection_dist`.
+        self.graph[(x, y)]["neighbours"] = self.free_pos[nodes_within_threshold]
+        self.graph[(x, y)]["costs"] = distances[nodes_within_threshold]
+
     def _build_graph(self):
         """
-        Builds the PRM graph
+        Builds the PRM graph.
         """
-
         self._sample_free_nodes()
         for i in range(self.num_nodes):
-            # Compute distance from given node to all other nodes.
-            x, y = self.free_pos[i][0], self.free_pos[i][1]
-            distances = np.linalg.norm([x, y] - self.free_pos, axis=1)
-            # Select only the nodes for which distance is not greater than `max_connection_dist`.
-            is_not_same_node = distances > 0
-            is_within_threshold = distances < self.max_connection_dist
-            nodes_within_threshold = np.where(is_within_threshold & is_not_same_node)
-            # Add edges from current node to all other nodes within `max_connection_dist`.
-            self.graph[(x, y)]["neighbours"] = self.free_pos[nodes_within_threshold]
-            self.graph[(x, y)]["costs"] = distances[nodes_within_threshold]
+            # Add the node and its neighbours to graph
+            self._add_neighbours(self.free_pos[i])
+
+    def _add_start_goal(self, start, goal):
+        """
+        Add the start and goal nodes to graph and creates the necessary edges.
+
+        :param start: The start node.
+        :type start: [int, int]
+        :param goal: The goal node.
+        :type goal: [int, int]
+        """  
+        self._add_neighbours(np.array(start, dtype=np.uint16))
+        self._add_neighbours(np.array(goal), dtype=np.uint16)
 
     def _is_valid_start_goal(self):
         """
@@ -141,7 +160,6 @@ class PRMGridPlanner:
         :return: Path from start to goal.
         :rtype: :class:`pyrobosim.utils.motion.Path`
         """
-
         if isinstance(start, Node):
             start = start.pose
         if isinstance(goal, Node):
@@ -151,3 +169,5 @@ class PRMGridPlanner:
         # If start or goal position is occupied, return empty path with warning.
         if not self._is_valid_start_goal():
             return self.latest_path
+
+        self._add_start_goal(self.start, self.goal)
