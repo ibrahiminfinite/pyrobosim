@@ -1,9 +1,12 @@
 """ Grid based PRM (Probablistic Roadmap) implementation. """
 
 import time
+import math
 import warnings
 import numpy as np
+from queue import PriorityQueue
 from collections import defaultdict
+from pyrobosim.utils.pose import Pose
 from pyrobosim.utils.motion import Path
 from pyrobosim.navigation.search_graph import Node
 from pyrobosim.navigation.occupancy_grid import occupancy_grid_from_world
@@ -131,7 +134,7 @@ class PRMGridPlanner:
         :type start: [int, int]
         :param goal: The goal node.
         :type goal: [int, int]
-        """  
+        """
         self._add_neighbours(np.array(start, dtype=np.uint16))
         self._add_neighbours(np.array(goal), dtype=np.uint16)
 
@@ -153,9 +156,47 @@ class PRMGridPlanner:
 
     def _find_path(self):
         """
-        Uses A* to find a path from start to goal using the graph that was built
+        Uses graph A* to find a path from start to goal using the graph that was built
         """
-        pass
+        candidates = PriorityQueue()  # Stores the nodes for exploration
+        parent_of = {}  # Keeps track of parents of each node
+        cost_till = {}  # Keeps track of cost till each node
+        path_found = False
+        timed_out = False
+        # Finds linear distance from node to goal
+        heuristic = lambda node: math.sqrt(
+            (node[0] - self.goal[0]) ** 2 + (node[1] - self.goal[1]) ** 2
+        )
+
+        start_time = time.time()
+        candidates.add((heuristic(self.start), self.start))
+        while not path_found and not timed_out:
+            current = candidates.get()[1]
+            if current == self.goal:
+                path_found = True
+                break
+            # Expand neighbours
+            neighbours, costs = self.graph[current]
+            for i in range(len(neighbours)):
+                new_cost = costs[i]
+                new_node = neighbours[i]
+                if new_node not in cost_till or new_cost < cost_till[new_node]:
+                    candidates.put((new_cost + heuristic(new_node), new_node))
+                    parent_of[new_node] = current
+                    cost_till[new_node] = new_cost
+            self.planning_time = time.time() - start_time
+            timed_out = self.planning_time > self.max_planning_time
+
+        if path_found:
+            poses = []
+            while current is not None:
+                poses.append(Pose(current[0], current[1]))
+                current = parent_of[current]
+            self.latest_path = Path(poses=poses)
+            self.latest_path.fill_yaws()
+            return self.latest_path
+        else:
+            return Path()
 
     def plan(self, start, goal):
         """
@@ -180,5 +221,4 @@ class PRMGridPlanner:
 
         self._add_start_goal(self.start, self.goal)
         # TODO : Should the start and goal node be removed after the plan is made ?
-
         self._find_path()
