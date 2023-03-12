@@ -68,7 +68,9 @@ class PRMGridPlanner:
         self.graph = defaultdict(
             lambda: {"neighbours": np.ndarray, "costs": np.ndarray}
         )
+        self.disconnected_nodes = []
         self._build_graph()
+       
 
     def _set_occupancy_grid(self):
         """
@@ -111,12 +113,17 @@ class PRMGridPlanner:
         distances = np.linalg.norm([x, y] - self.free_pos, axis=1)
         # Select only the nodes for which distance is not greater than `max_connection_dist`.
         is_not_same_node = distances > 0
-        is_within_threshold = distances < self.max_connection_dist
+        is_within_threshold = distances < (self.max_connection_dist / self.resolution)
         nodes_within_threshold = np.where(is_within_threshold & is_not_same_node)
         # TODO : Check connectivity
         # Add edges from current node to all other nodes within `max_connection_dist`.
-        self.graph[(x, y)]["neighbours"] = self.free_pos[nodes_within_threshold]
-        self.graph[(x, y)]["costs"] = distances[nodes_within_threshold]
+        if len(nodes_within_threshold[0]) == 0:
+            print(f"No connectable neighbours found for {node}")
+            self.disconnected_nodes.append(node)
+        # print(f"Found {nodes_within_threshold} connectable nodes")
+        else:
+            self.graph[(x, y)]["neighbours"] = self.free_pos[nodes_within_threshold]
+            self.graph[(x, y)]["costs"] = distances[nodes_within_threshold]
 
     def _build_graph(self):
         """
@@ -134,7 +141,7 @@ class PRMGridPlanner:
         x, y = self.start
         self._add_neighbours(np.array([x, y], dtype=np.uint16))
         x, y = self.goal
-        self._add_neighbours(np.array([x, y]), dtype=np.uint16)
+        self._add_neighbours(np.array([x, y], dtype=np.uint16))
 
     def _remove_start_goal(self):
         """
@@ -171,20 +178,28 @@ class PRMGridPlanner:
         # Finds linear distance from node to goal
         heuristic = lambda node: math.sqrt(
             (node[0] - self.goal[0]) ** 2 + (node[1] - self.goal[1]) ** 2
-        )
+        ) * self.resolution
 
         start_time = time.time()
-        candidates.add((heuristic(self.start), self.start))
+        candidates.put((heuristic(self.start), self.start))
+        parent_of[self.start] = None
+        cost_till[self.start] = 0.0
         while not path_found and not timed_out:
             current = candidates.get()[1]
+            print(f"Current : {current}")
             if current == self.goal:
                 path_found = True
                 break
             # Expand neighbours
-            neighbours, costs = self.graph[current]
+            neighbours = self.graph[current]["neighbours"]
+            print(f" Neighbours : {neighbours}")
+            costs = self.graph[current]["costs"]
+            print(f"Costs : {costs}")
             for i in range(len(neighbours)):
                 new_cost = costs[i]
-                new_node = neighbours[i]
+                new_node = (neighbours[i][0], neighbours[i][1])
+                print(f"New node : {new_node}")
+                print(f"New cost : {new_cost}")
                 if new_node not in cost_till or new_cost < cost_till[new_node]:
                     candidates.put((new_cost + heuristic(new_node), new_node))
                     parent_of[new_node] = current
@@ -227,6 +242,8 @@ class PRMGridPlanner:
         :return: Path from start to goal.
         :rtype: :class:`pyrobosim.utils.motion.Path`
         """
+        self.reset(rebuild_graph=False)
+        print(f"Grid size: {self.grid.data.shape}")
         # Handle Node inputs since this is a global planner
         if isinstance(start, Node):
             start = start.pose
@@ -238,10 +255,12 @@ class PRMGridPlanner:
         # If start or goal position is occupied, return empty path with warning.
         if not self._is_valid_start_goal():
             return self.latest_path
-
+        print(f"Start : {self.start}")
+        print(f"Goal : {self.goal}")
         # Planning
-        self.reset()
+        
         self._add_start_goal()
+        print(f"No neighbours found for {len(self.disconnected_nodes)} nodes")
         self._find_path()
         self._remove_start_goal()
         return self.latest_path
