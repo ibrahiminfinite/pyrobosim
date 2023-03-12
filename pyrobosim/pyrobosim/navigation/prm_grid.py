@@ -68,6 +68,7 @@ class PRMGridPlanner:
         self.graph = defaultdict(
             lambda: {"neighbours": np.ndarray, "costs": np.ndarray}
         )
+        self._build_graph()
 
     def _set_occupancy_grid(self):
         """
@@ -126,17 +127,21 @@ class PRMGridPlanner:
             # Add the node and its neighbours to graph
             self._add_neighbours(self.free_pos[i])
 
-    def _add_start_goal(self, start, goal):
+    def _add_start_goal(self):
         """
         Add the start and goal nodes to graph and creates the necessary edges.
-
-        :param start: The start node.
-        :type start: [int, int]
-        :param goal: The goal node.
-        :type goal: [int, int]
         """
-        self._add_neighbours(np.array(start, dtype=np.uint16))
-        self._add_neighbours(np.array(goal), dtype=np.uint16)
+        x, y = self.start
+        self._add_neighbours(np.array([x, y], dtype=np.uint16))
+        x, y = self.goal
+        self._add_neighbours(np.array([x, y]), dtype=np.uint16)
+
+    def _remove_start_goal(self):
+        """
+        Removes start and goal from the graph
+        """
+        self.graph.pop(self.start)
+        self.graph.pop(self.goal)
 
     def _is_valid_start_goal(self):
         """
@@ -156,7 +161,7 @@ class PRMGridPlanner:
 
     def _find_path(self):
         """
-        Uses graph A* to find a path from start to goal using the graph that was built
+        Uses graph A* to find a path from start to goal.
         """
         candidates = PriorityQueue()  # Stores the nodes for exploration
         parent_of = {}  # Keeps track of parents of each node
@@ -194,9 +199,19 @@ class PRMGridPlanner:
                 current = parent_of[current]
             self.latest_path = Path(poses=poses)
             self.latest_path.fill_yaws()
-            return self.latest_path
-        else:
-            return Path()
+
+    def reset(self, rebuild_graph=False):
+        """
+        Resets the data structures and rebuilds the PRM graph
+        """
+        self.goal = None
+        self.start = None
+        self.graph.clear()
+        self.free_pos.fill(0)
+        self.planning_time = 0
+        self.latest_path = Path()
+        if rebuild_graph:
+            self._build_graph()
 
     def plan(self, start, goal):
         """
@@ -209,16 +224,20 @@ class PRMGridPlanner:
         :return: Path from start to goal.
         :rtype: :class:`pyrobosim.utils.motion.Path`
         """
+        # Handle Node inputs since this is a global planner
         if isinstance(start, Node):
             start = start.pose
         if isinstance(goal, Node):
             goal = goal.pose
+
         self.start = self.grid.world_to_grid((start.x, start.y))
         self.goal = self.grid.world_to_grid((goal.x, goal.y))
         # If start or goal position is occupied, return empty path with warning.
         if not self._is_valid_start_goal():
             return self.latest_path
 
-        self._add_start_goal(self.start, self.goal)
-        # TODO : Should the start and goal node be removed after the plan is made ?
+        # Planning
+        self._add_start_goal()
         self._find_path()
+        self._remove_start_goal()
+        return self.latest_path
